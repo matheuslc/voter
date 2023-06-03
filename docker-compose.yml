@@ -1,0 +1,57 @@
+version: "3.7"
+services:
+  voter-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    network_mode: host
+    depends_on:
+      - voter-postgres
+    ports:
+      - 3001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      PORT: 3001
+      ENVIRONMENT: dev
+      PG_PORT: 5432
+      PG_HOST: localhost
+      PG_DATABASE: tsdb
+      PG_USER: postgres
+      PG_PASSWORD: pgpass
+      PG_SSLMODE: disable
+
+  voter-migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: refinery
+    network_mode: host
+    depends_on:
+      - voter-postgres
+    ports:
+      - 3001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      PORT: 3001
+      ENVIRONMENT: dev
+      DATABASE_URL: postgres://postgres:pgpass@localhost:5432/tsdb?sslmode=disable
+      PG_PORT: 5432
+      PG_HOST: localhost
+      PG_DATABASE: tsdb
+      PG_USER: postgres
+      PG_PASSWORD: pgpass
+      PG_SSLMODE: disable
+
+  voter-postgres:
+    platform: linux/amd64
+    image: timescale/timescaledb:latest-pg15
+    environment:
+      POSTGRES_PASSWORD: pgpass
+      POSTGRES_DB: tsdb
+    ports:
+      - "5432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
