@@ -2,8 +2,10 @@ use tokio_postgres::NoTls;
 use tokio;
 
 mod user;
+mod poll;
 
-use user::Repository;
+use user::Repository as userRepository;
+use poll::Repository as pollRepository;
 
 #[tokio::main]
 async fn main() {
@@ -22,12 +24,20 @@ async fn main() {
         }
     });
 
-    let repo = user::PGRepository { client };
-    let unregUser = user::create_unregisted("mematheuslc@gmail.com".to_string());
-    let user = repo.create(unregUser).await;
+    let repo = user::PGRepository { client: &client };
+    let unreg_user = user::create_unregisted("mematheuslc@gmail.com".to_string());
+    let final_user = repo.create(unreg_user).await;
+    
+    let poll_repo = poll::PGRepository { client: &client };
+    let first_poll = poll_repo.create_poll(poll::UnregistedPoll { poll_name: "First poll".to_string() }).await;
+    let first_option = poll_repo.create_option(poll::UnregistedOption { option_name: "First option".to_string(), option_order: 1 }).await;
+    let _second_option = poll_repo.create_option(poll::UnregistedOption { option_name: "Second option".to_string(), option_order: 2 }).await;
 
-    match user {
-        Ok(user) => println!("User created: {:?}", user),
-        Err(e) => println!("Error creating user: {:?}", e),
+
+    let vote = poll_repo.create_vote(poll::UnregistedVote { poll_id: first_poll.unwrap().poll_id, option_id: first_option.unwrap().option_id, user_id: final_user.unwrap().user_id }).await;
+
+    match vote {
+        Ok(v) => println!("Vote: {:?}", v),
+        Err(e) => println!("Error: {:?}", e),
     }
 }
