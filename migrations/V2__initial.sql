@@ -25,19 +25,6 @@ create table if not exists public.poll_options
     option_order integer not null
 );
 
-create table if not exists public.polls
-(
-    polls_id  integer generated always as identity
-        constraint polls_pk
-            primary key,
-    poll_id   integer not null
-        constraint polls_poll_fk
-            references public.poll,
-    option_id integer
-        constraint polls_option_fk
-            references public.poll_options
-);
-
 create table if not exists public.vote
 (
     vote_id    integer generated always as identity,
@@ -50,10 +37,7 @@ create table if not exists public.vote
             references public.users,
     option_id  integer   not null
         constraint vote_poll_options_option_id_fk
-            references public.poll_options,
-    polls_id   integer   not null
-        constraint vote_polls_polls_id_fk
-            references public.polls
+            references public.poll_options
 );
 
 create index if not exists vote_created_at_idx

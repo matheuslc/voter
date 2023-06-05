@@ -8,10 +8,16 @@ pub struct User {
     pub email: String,
 }
 
+#[derive(Debug)]
 pub struct UnregistedUser {
     email: String,
 }
 
+// ## Example
+/// ```
+/// let unreg_user = create_unregisted("test@test");
+/// assert_eq!(unreg_user.email, "test@test");
+/// ```
 pub fn create_unregisted(email: String) -> UnregistedUser {
     UnregistedUser { email }
 }
@@ -21,12 +27,12 @@ pub trait Repository {
     async fn create(&self, user: UnregistedUser) -> Result<User, Error>;
 }
 
-pub struct PGRepository {
-    pub client: tokio_postgres::Client,
+pub struct PGRepository<'a>  {
+    pub client: &'a tokio_postgres::Client,
 }
 
 #[async_trait]
-impl Repository for PGRepository {
+impl Repository for PGRepository<'_> {
     async fn create(&self, user: UnregistedUser) -> Result<User, Error> {
         // Uses the client to create a new user in the database.
 
