@@ -1,15 +1,18 @@
 use async_trait::async_trait;
 use tokio_postgres::Error;
 use tokio_postgres::Row;
+use serde::Deserialize;
+use validator::{Validate, ValidationErrors};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct User {
     pub user_id: i32,
     pub email: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Validate, Deserialize)]
 pub struct UnregistedUser {
+    #[validate(email)]
     email: String,
 }
 
@@ -18,8 +21,13 @@ pub struct UnregistedUser {
 /// let unreg_user = create_unregisted("test@test");
 /// assert_eq!(unreg_user.email, "test@test");
 /// ```
-pub fn create_unregisted(email: String) -> UnregistedUser {
-    UnregistedUser { email }
+pub fn create_unregisted(email: String) -> Result<UnregistedUser, ValidationErrors> {
+    let ur = UnregistedUser { email };
+
+    match ur.validate() {
+        Ok(_) => Ok(ur),
+        Err(e) => Err(e),
+    }
 }
 
 #[async_trait]

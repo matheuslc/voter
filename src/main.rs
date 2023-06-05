@@ -1,50 +1,56 @@
-use tokio_postgres::NoTls;
 use tokio;
+use tokio_postgres::NoTls;
 
-mod user;
 mod poll;
+mod user;
 
-use user::Repository as userRepository;
 use poll::Repository as pollRepository;
+use user::Repository as userRepository;
+
+use tonic::{transport::Server, Request, Response, Status};
+
+use voterproto::vote_service_server::{VoteService, VoteServiceServer};
+use voterproto::{CreateVoteRequest, CreateVoteResponse};
+
+pub mod voterproto {
+    tonic::include_proto!("voterproto");
+}
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Database connection string
-    let conn_string = "host=localhost user=postgres password=pgpass dbname=tsdb";
+    // let conn_string = "host=localhost user=postgres password=pgpass dbname=tsdb";
 
     // Connect to the database
-    let (client, connection) =
-        tokio_postgres::connect(conn_string, NoTls).await.expect("Failed to connect to Postgres database");
+    // let (client, connection) = tokio_postgres::connect(conn_string, NoTls)
+    //     .await
+    //     .expect("Failed to connect to Postgres database");
 
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
+    let addr = "[::1]:50051".parse().unwrap();
+    let s = VoterServiceReady::default();
 
-    let repo = user::PGRepository { client: &client };
-    let unreg_user = user::create_unregisted("mematheuslc@gmail.com".to_string());
-    let final_user = repo.create(unreg_user).await;
-    
-    let poll_repo = poll::PGRepository { client: &client };
-    let first_poll = poll_repo.create_poll(poll::UnregistedPoll { poll_name: "First poll".to_string() }).await;
+    println!("Voter server listening on {}", addr);
 
-    match first_poll {
-        Ok(p) => {
-            let first_option = poll_repo.create_option(poll::UnregistedOption { option_name: "First option".to_string(), option_order: 1 }).await;
-            let _second_option = poll_repo.create_option(poll::UnregistedOption { option_name: "Second option".to_string(), option_order: 2 }).await;
+    Server::builder()
+        .add_service(VoteServiceServer::new(s))
+        .serve(addr)
+        .await?;
 
-            let vot = poll_repo.create_vote(poll::UnregistedVote { poll_id: p.poll_id, option_id: first_option.unwrap().option_id, user_id: final_user.unwrap().user_id }).await;
-            
-            match vot {
-                Ok(v) => println!("Vote: {:?}", v),
-                Err(e) => println!("Error: {:?}", e),
-            }
-        },
-        Err(e) => println!("Error: {:?}", e),
+    Ok(())
+}
+
+#[derive(Debug, Default)]
+pub struct VoterServiceReady {}
+
+#[tonic::async_trait]
+impl VoteService for VoterServiceReady {
+    async fn vote(
+        &self,
+        request: Request<voterproto::CreateVoteRequest>,
+    ) -> Result<Response<voterproto::CreateVoteResponse>, Status> {
+        println!("Request from {:?}", request.remote_addr());
+        let response = voterproto::CreateVoteResponse { status: 0 };
+
+        Ok(Response::new(response))
     }
-
-
 }
