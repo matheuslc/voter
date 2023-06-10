@@ -45,12 +45,13 @@ pub trait Repository {
     async fn create_vote(&self, vote: UnregistedVote) -> Result<Vote, Error>;
 }
 
-pub struct PGRepository<'a> {
-    pub client: &'a tokio_postgres::Client,
+#[derive(Debug)]
+pub struct PGRepository {
+    pub client: tokio_postgres::Client,
 }
 
 #[async_trait]
-impl Repository for PGRepository<'_> {
+impl Repository for PGRepository {
     async fn create_poll(&self, poll: UnregistedPoll) -> Result<Poll, Error> {
         // Uses the client to create a new user in the database.
 

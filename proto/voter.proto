@@ -3,13 +3,13 @@ syntax = "proto3";
 package voterproto;
 
 message CreateVoteRequest {
-    int64 user_id = 1;
-    int64 option_id = 2;
-    int64 poll_id = 3;
+    int32 user_id = 1;
+    int32 option_id = 2;
+    int32 poll_id = 3;
 }
 
 message CreateVoteResponse {
-    int64 status = 1;
+    int32 status = 1;
 }
 
 service VoteService {

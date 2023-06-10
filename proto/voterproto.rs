@@ -1,18 +1,18 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreateVoteRequest {
-    #[prost(int64, tag = "1")]
-    pub user_id: i64,
-    #[prost(int64, tag = "2")]
-    pub option_id: i64,
-    #[prost(int64, tag = "3")]
-    pub poll_id: i64,
+    #[prost(int32, tag = "1")]
+    pub user_id: i32,
+    #[prost(int32, tag = "2")]
+    pub option_id: i32,
+    #[prost(int32, tag = "3")]
+    pub poll_id: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreateVoteResponse {
-    #[prost(int64, tag = "1")]
-    pub status: i64,
+    #[prost(int32, tag = "1")]
+    pub status: i32,
 }
 /// Generated client implementations.
 pub mod vote_service_client {
