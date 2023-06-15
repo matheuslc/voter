@@ -1,50 +1,89 @@
-use tokio_postgres::NoTls;
+use std::str::FromStr;
+
 use tokio;
+use tokio_postgres::{NoTls};
 
-mod user;
 mod poll;
+mod user;
 
-use user::Repository as userRepository;
 use poll::Repository as pollRepository;
+use user::Repository as userRepository;
+
+use tonic::{transport::Server, Request, Response, Status};
+
+use voterproto::vote_service_server::{VoteService, VoteServiceServer};
+use voterproto::{CreateVoteRequest, CreateVoteResponse};
+
+pub mod voterproto {
+    include!("../proto/voterproto.rs");
+}
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Database connection string
     let conn_string = "host=localhost user=postgres password=pgpass dbname=tsdb";
+    let config = tokio_postgres::Config::from_str(conn_string).unwrap();
 
-    // Connect to the database
-    let (client, connection) =
-        tokio_postgres::connect(conn_string, NoTls).await.expect("Failed to connect to Postgres database");
+    let manager = bb8_postgres::PostgresConnectionManager::new(config, NoTls);
+    let pool = bb8::Pool::builder()
+        .max_size(250)
+        .build(manager)
+        .await
+        .unwrap();
 
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
-    let repo = user::PGRepository { client: &client };
+    let repo = user::PGRepository { client: pool.clone() };
     let unreg_user = user::create_unregisted("mematheuslc@gmail.com".to_string());
-    let final_user = repo.create(unreg_user).await;
-    
-    let poll_repo = poll::PGRepository { client: &client };
-    let first_poll = poll_repo.create_poll(poll::UnregistedPoll { poll_name: "First poll".to_string() }).await;
+    let final_user = repo.create(unreg_user.unwrap()).await;
 
-    match first_poll {
-        Ok(p) => {
-            let first_option = poll_repo.create_option(poll::UnregistedOption { option_name: "First option".to_string(), option_order: 1 }).await;
-            let _second_option = poll_repo.create_option(poll::UnregistedOption { option_name: "Second option".to_string(), option_order: 2 }).await;
+    println!("User created: {:?}", final_user);
 
-            let vot = poll_repo.create_vote(poll::UnregistedVote { poll_id: p.poll_id, option_id: first_option.unwrap().option_id, user_id: final_user.unwrap().user_id }).await;
-            
-            match vot {
-                Ok(v) => println!("Vote: {:?}", v),
-                Err(e) => println!("Error: {:?}", e),
-            }
-        },
-        Err(e) => println!("Error: {:?}", e),
+    let poll_repo = poll::PGRepository { client: pool.clone() };
+    poll::UnregistedPoll { poll_name: "Test".to_string() };
+
+    poll_repo.create_option(poll::UnregistedOption { option_name: "a".to_string(), option_order: 1 }).await?;
+    poll_repo.create_option(poll::UnregistedOption { option_name: "b".to_string(), option_order: 2 }).await?;
+    poll_repo.create_poll(poll::UnregistedPoll { poll_name: "Test".to_string() }).await?;
+
+    let addr = "[::1]:50051".parse().unwrap();
+    let s = VoterServiceReady{ poll_repo: poll_repo };
+
+    println!("Voter server listening on {}", addr);
+
+    Server::builder()
+        .add_service(VoteServiceServer::new(s))
+        .serve(addr)
+        .await?;
+
+    Ok(())
+}
+
+#[derive(Debug)]
+pub struct VoterServiceReady {
+    pub poll_repo: poll::PGRepository,
+}
+
+#[tonic::async_trait]
+impl VoteService for VoterServiceReady {
+    async fn vote(
+        &self,
+        request: Request<CreateVoteRequest>,
+    ) -> Result<Response<CreateVoteResponse>, Status> {
+        println!("Request from {:?}", request.remote_addr());
+        println!("Created options for {:?}", request.remote_addr());
+
+        let vot =  self.poll_repo.create_vote(poll::UnregistedVote { 
+            poll_id: request.get_ref().poll_id,
+            option_id: request.get_ref().option_id,
+            user_id: request.get_ref().user_id, 
+        }).await;
+
+        let response = CreateVoteResponse { status: 0 };
+
+        match vot {
+            Ok(_) => println!(),
+            Err(e) => println!("Error creating vote {:?}", e),
+        }
+
+        Ok(Response::new(response))
     }
-
-
 }
