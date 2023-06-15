@@ -1,5 +1,7 @@
+use std::str::FromStr;
+
 use tokio;
-use tokio_postgres::NoTls;
+use tokio_postgres::{NoTls};
 
 mod poll;
 mod user;
@@ -20,19 +22,28 @@ pub mod voterproto {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Database connection string
     let conn_string = "host=localhost user=postgres password=pgpass dbname=tsdb";
+    let config = tokio_postgres::Config::from_str(conn_string).unwrap();
 
-    // Connect to the database
-    let (client, _) = tokio_postgres::connect(conn_string, NoTls)
+    let manager = bb8_postgres::PostgresConnectionManager::new(config, NoTls);
+    let pool = bb8::Pool::builder()
+        .max_size(250)
+        .build(manager)
         .await
-        .expect("Failed to connect to Postgres database");
+        .unwrap();
 
-    let repo = user::PGRepository { client: &client };
+    let repo = user::PGRepository { client: pool.clone() };
     let unreg_user = user::create_unregisted("mematheuslc@gmail.com".to_string());
     let final_user = repo.create(unreg_user.unwrap()).await;
 
     println!("User created: {:?}", final_user);
 
-    let poll_repo = poll::PGRepository { client: client };
+    let poll_repo = poll::PGRepository { client: pool.clone() };
+    poll::UnregistedPoll { poll_name: "Test".to_string() };
+
+    poll_repo.create_option(poll::UnregistedOption { option_name: "a".to_string(), option_order: 1 }).await?;
+    poll_repo.create_option(poll::UnregistedOption { option_name: "b".to_string(), option_order: 2 }).await?;
+    poll_repo.create_poll(poll::UnregistedPoll { poll_name: "Test".to_string() }).await?;
+
     let addr = "[::1]:50051".parse().unwrap();
     let s = VoterServiceReady{ poll_repo: poll_repo };
 
@@ -69,7 +80,7 @@ impl VoteService for VoterServiceReady {
         let response = CreateVoteResponse { status: 0 };
 
         match vot {
-            Ok(v) => println!("Vote created {:?}", v),
+            Ok(_) => println!(),
             Err(e) => println!("Error creating vote {:?}", e),
         }
 

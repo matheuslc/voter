@@ -3,6 +3,9 @@ use tokio_postgres::Error;
 use tokio_postgres::Row;
 use serde::Deserialize;
 use validator::{Validate, ValidationErrors};
+use bb8::{Pool};
+use bb8_postgres::{PostgresConnectionManager};
+use tokio_postgres::{NoTls};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct User {
@@ -35,20 +38,18 @@ pub trait Repository {
     async fn create(&self, user: UnregistedUser) -> Result<User, Error>;
 }
 
-pub struct PGRepository<'a>  {
-    pub client: &'a tokio_postgres::Client,
+pub struct PGRepository {
+    pub client: Pool<PostgresConnectionManager<NoTls>>,
 }
 
 #[async_trait]
-impl Repository for PGRepository<'_> {
+impl Repository for PGRepository {
     async fn create(&self, user: UnregistedUser) -> Result<User, Error> {
         // Uses the client to create a new user in the database.
+        let conn = self.client.get().await.unwrap();
 
-        let statement = self
-            .client
-            .prepare("INSERT INTO users (email) VALUES ($1) RETURNING user_id, email")
-            .await?;
-        let row: Row = self.client.query_one(&statement, &[&user.email]).await?;
+        let statement = conn.prepare("INSERT INTO users (email) VALUES ($1) RETURNING user_id, email").await?;
+        let row: Row = conn.query_one(&statement, &[&user.email]).await?;
 
         Ok(User {
             user_id: row.get(0),

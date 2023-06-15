@@ -1,6 +1,8 @@
 version: "3.7"
 services:
   voter-dev:
+    cpus: 0.5
+    mem_limit: 128m
     build:
       context: .
       dockerfile: Dockerfile

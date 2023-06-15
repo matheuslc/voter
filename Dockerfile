@@ -14,6 +14,11 @@ WORKDIR /usr/src/voter
 # Copy the source code
 COPY . .
 
+RUN . ./bin/activate-hermit
+
+# Set PROTOC env var
+ENV PROTOC=/usr/src/voter/bin/protoc
+
 # Build for release
 RUN cargo build --release
 
